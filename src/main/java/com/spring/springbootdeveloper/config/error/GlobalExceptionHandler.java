@@ -4,6 +4,7 @@ import com.spring.springbootdeveloper.config.error.exception.BusinessBaseExcepti
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 
@@ -24,6 +25,26 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ErrorResponse> handle(BusinessBaseException e) {
         log.error("BusinessBaseException", e);
         return createErrorResponseEntity(e.getErrorCode());
+    }
+
+    // Bad Request 잘못된 인자 전송 시 예외 처리
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    protected ResponseEntity<ErrorResponse> handle(MethodArgumentNotValidException e) {
+        log.error("MethodArgumentNotValidException", e);
+
+        // 첫 번째 에러 메시지 추출
+        String errorMessage = e.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getField() + ": "+ error.getDefaultMessage())
+                .findFirst()
+                .orElse("올바르지 않은 입력입니다.");
+
+        // ReseponseEntity
+        return new ResponseEntity<>(
+                ErrorResponse.of(ErrorCode.INVALID_INPUT_VALUE, errorMessage),
+                ErrorCode.INVALID_INPUT_VALUE.getStatus()
+        );
     }
 
     // 그 외 예외처리 메소드
