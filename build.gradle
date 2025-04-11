@@ -1,0 +1,56 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.spring'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(17)
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // OAuth2를 사용하기 위한 스타터 추가
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    runtimeOnly 'com.h2database:h2'
+
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+    testCompileOnly 'org.projectlombok:lombok' // 테스트 의존성 추가
+    testAnnotationProcessor 'org.projectlombok:lombok' // 테스트 의존성 추가
+
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
+
+    // spring security
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    // 타임리프에서 스프링 시큐리티 사용위한 의존성 추가
+    implementation 'org.thymeleaf.extras:thymeleaf-extras-springsecurity6'
+    // 스프링 시큐리티 테스트 하기 위한 의존성 추가
+    testImplementation 'org.springframework.security:spring-security-test'
+
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt:0.9.1'    //  자바 JWT 라이브러리
+    implementation 'javax.xml.bind:jaxb-api:2.3.1'  // xml 문서와 Java 객체간 매핑을 자동화
+
+    // MySQL
+    implementation 'com.mysql:mysql-connector-j'
+
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
