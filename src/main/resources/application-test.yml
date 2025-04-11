@@ -21,6 +21,3 @@ spring:
             scope:
               - email
               - profile
-jwt:
-  issuer: kindnsoopy2@gmail.com
-  secret_key: study-springboot
