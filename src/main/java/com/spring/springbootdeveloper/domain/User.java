@@ -34,12 +34,16 @@ public class User implements UserDetails {
     @Column(name = "nickname", unique = true)
     private String nickname;
 
+    @Column(name = "provider")
+    private String provider;
+
 
     @Builder
-    public User(String email, String password, String nickname) {
+    public User(String email, String password, String nickname, String provider) {
         this.email = email;
         this.password = password;
         this.nickname = nickname;   // OAuth2 하면서 추가
+        this.provider = provider;   // 소셜로그인 분리용
     }
 
     // 사용자 이름 변경

@@ -10,6 +10,7 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
@@ -18,9 +19,11 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";      // 재발급 토큰 쿠키명
@@ -37,26 +40,50 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response
             , Authentication authentication) throws IOException {
+
         OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
-        User user = userService.findByEmail((String) oAuth2User.getAttributes().get("email"));
+        Map<String, Object> attributes = oAuth2User.getAttributes();
+        String provider = (String) attributes.get("provider");
+        String email = (String) attributes.get("email");
 
-        // 리프레시 토큰 생성 -> DB 저장 -> 쿠키에 저장
-        String refreshToken = tokenProvider.generateToken(user, REFRESH_TOKEN_DURATION);
-        saveRefreshToken(user.getId(), refreshToken);
-        addRefreshTokenToCookie(request, response, refreshToken);
+        log.info("Provider: {}, Email: {}, Attributes: {}", provider, email, attributes);
 
-        // 액세스 토큰 생성 -> 패스에 액세스 토큰을 추가
-        String accessToken = tokenProvider.generateToken(user, ACCESS_TOKEN_DURATION);
-        String targetUrl = getTargetUrl(accessToken);
+        if ("kakao".equals(provider) && email == null) {
+            Map<String, Object> kakaoAccount = (Map<String, Object>) oAuth2User.getAttributes().get("kakao_account");
+            log.info("kakao account : {}", kakaoAccount);
+            if (kakaoAccount != null) {
+                email = (String) kakaoAccount.get("email");
+                log.info("kakao email : {}", email);
+            }
+        }
+        else {
+            email = (String) oAuth2User.getAttributes().get("email");
+        }
 
-        // 액세스 토큰을 HttpOnly에 추가
-        addAccessTokenToCookie(response, accessToken);
+        try {
+            User user = userService.findByEmail(email);
 
-        // 인증 관련 설정값, 쿠키 제거
-        clearAuthenticationAttributes(request, response);
+            // 리프레시 토큰 생성 -> DB 저장 -> 쿠키에 저장
+            String refreshToken = tokenProvider.generateToken(user, REFRESH_TOKEN_DURATION);
+            saveRefreshToken(user.getId(), refreshToken);
+            addRefreshTokenToCookie(request, response, refreshToken);
 
-        // 리다이렉트
-        getRedirectStrategy().sendRedirect(request, response, targetUrl);
+            // 액세스 토큰 생성 -> 패스에 액세스 토큰을 추가
+            String accessToken = tokenProvider.generateToken(user, ACCESS_TOKEN_DURATION);
+            String targetUrl = getTargetUrl(accessToken);
+
+            // 액세스 토큰을 HttpOnly에 추가
+            addAccessTokenToCookie(response, accessToken);
+
+            // 인증 관련 설정값, 쿠키 제거
+            clearAuthenticationAttributes(request, response);
+
+            // 리다이렉트
+            getRedirectStrategy().sendRedirect(request, response, targetUrl);
+        } catch (IllegalArgumentException e) {
+            log.error("Failed to find for email: {}. Redirecting to login {}", email, e.getMessage());
+            response.sendRedirect("/login?error=user_not_found");
+        }
     }// end of public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication)
 
     // 액세스 토큰을 쿠키에 넣는 메소드
@@ -93,8 +120,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
 
     // 액세스 토큰을 패스에 추가하는 메소드
     private String getTargetUrl(String accessToken) {
-        return UriComponentsBuilder.fromUriString(REDIRECT_PATH)
-                .queryParam("token", accessToken)   // key: token, value: accessToken
-                .build().toUriString();
+//        return UriComponentsBuilder.fromUriString(REDIRECT_PATH)
+//                .queryParam("token", accessToken)   // key: token, value: accessToken
+//                .build().toUriString();
+        return REDIRECT_PATH;
     }
 }

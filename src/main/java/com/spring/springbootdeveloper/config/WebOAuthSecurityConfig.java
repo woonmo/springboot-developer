@@ -10,6 +10,7 @@ import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
@@ -21,10 +22,13 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
+import java.net.URLEncoder;
+
 import static org.springframework.boot.autoconfigure.security.servlet.PathRequest.toH2Console;
 
 @RequiredArgsConstructor
 @Configuration
+@Slf4j
 public class WebOAuthSecurityConfig {
 
     private final OAuth2UserCustomService oAuth2UserCustomService;
@@ -49,7 +53,7 @@ public class WebOAuthSecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .httpBasic(httpBasic -> httpBasic.disable())
                 .formLogin(formLogin -> formLogin.disable())
-                .logout(logout -> logout.disable())
+//                .logout(logout -> logout.disable())
 
                 // 세션 비활성화
                 .sessionManagement(session -> session
@@ -63,7 +67,7 @@ public class WebOAuthSecurityConfig {
                 // 토큰 재발급 URL 은 인증 없이 접근 가능하도록 설정, 나머지 API URL은 인증 필요
                 .authorizeHttpRequests((auth) -> auth
                             .dispatcherTypeMatchers(DispatcherType.FORWARD).permitAll()
-                            .requestMatchers("/api/token", "/login").permitAll()
+                            .requestMatchers("/api/token", "/login", "/oauth2/authorization/kakao", "/login/oauth2/code/kakao").permitAll()
 //                            .requestMatchers("/api/**").authenticated()
                             .anyRequest().authenticated()
                 )
@@ -79,11 +83,21 @@ public class WebOAuthSecurityConfig {
                             .userInfoEndpoint(userInfo -> userInfo
                                     .userService(oAuth2UserCustomService)
                             )
+                            .failureHandler((request, response, exception) -> {
+                                log.error("OAuth2 login failed: {}", exception.getMessage());
+                                response.sendRedirect("/login?error=" + URLEncoder.encode(exception.getMessage(), "UTF-8"));
+                            })
                 )
 
                 // 로그아웃 시 리다이렉트
                 .logout(logout -> logout
                         .logoutSuccessUrl("/login")
+                        /*.logoutSuccessHandler((request, response, authentication) -> {
+                            String token = extractToken(request); // JWT 추출 로직
+                            if (token != null) {
+                                refreshTokenRepositoty.deleteByRefreshToken(token);
+                            }
+                        })*/
                 )
 
                 // /api로 시작하는 url인 경우 401 상태 코드를 반환하도록 예외 처리
