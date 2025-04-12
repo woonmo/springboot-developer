@@ -69,6 +69,10 @@ public class OAuth2UserCustomService extends DefaultOAuth2UserService {
 
         if ("kakao".equals(providerId)) {
             // 카카오 로그인 로직 처리
+            // Loaded user attributes: {id=4212814479, connected_at=2025-04-12T00:09:13Z
+            // , properties={nickname=이원모, profile_image=http://k.kakaocdn.net/dn/btb0LS/btqH0Whz1VG/4V69ypeuj5tN0ddQLL051k/img_640x640.jpg, thumbnail_image=http://k.kakaocdn.net/dn/btb0LS/btqH0Whz1VG/4V69ypeuj5tN0ddQLL051k/img_110x110.jpg}
+            // , kakao_account={profile_nickname_needs_agreement=false, profile_image_needs_agreement=false
+            // , profile={nickname=이원모, thumbnail_image_url=http://k.kakaocdn.net/dn/btb0LS/btqH0Whz1VG/4V69ypeuj5tN0ddQLL051k/img_110x110.jpg, profile_image_url=http://k.kakaocdn.net/dn/btb0LS/btqH0Whz1VG/4V69ypeuj5tN0ddQLL051k/img_640x640.jpg, is_default_image=false, is_default_nickname=false}, has_email=true, email_needs_agreement=false, is_email_valid=true, is_email_verified=true, email=wonmo151@daum.net}}
             Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
             if (kakaoAccount == null) {
                 log.error("kakao_account is null for attributes: {}", attributes);
@@ -90,6 +94,12 @@ public class OAuth2UserCustomService extends DefaultOAuth2UserService {
             // 구글 로그인 로직 처리
             email = (String) attributes.get("email");
             name = (String) attributes.get("name");
+        }
+        else if ("naver".equals(providerId)) {
+            // Loaded user attributes: {resultcode=00, message=success, response={id=C3MQPhJWHobtcZufNt4uWTojVPB1xUaodMLaky3BfKU, email=wonmo151@naver.com, name=이원모}}
+            Map<String, Object> naverUserInfo = (Map<String, Object>) attributes.get("response");
+            email = (String) naverUserInfo.get("email");
+            name = (String) naverUserInfo.get("name");
         }
         else {
             throw new IllegalArgumentException("Unknown provider: " + providerId);
