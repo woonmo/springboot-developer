@@ -4,10 +4,15 @@ import com.spring.springbootdeveloper.config.jwt.TokenProvider;
 import com.spring.springbootdeveloper.config.oauth.OAuth2AuthorizationRequestBasedOnCookieRepository;
 import com.spring.springbootdeveloper.config.oauth.OAuth2SuccessHandler;
 import com.spring.springbootdeveloper.config.oauth.OAuth2UserCustomService;
+import com.spring.springbootdeveloper.domain.RefreshToken;
+import com.spring.springbootdeveloper.domain.User;
 import com.spring.springbootdeveloper.repository.RefreshTokenRepositoty;
 import com.spring.springbootdeveloper.service.UserService;
+import com.spring.springbootdeveloper.util.CookieUtil;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.Filter;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,12 +22,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 import java.net.URLEncoder;
+import java.util.Optional;
 
 import static org.springframework.boot.autoconfigure.security.servlet.PathRequest.toH2Console;
 
@@ -91,13 +98,54 @@ public class WebOAuthSecurityConfig {
 
                 // 로그아웃 시 리다이렉트
                 .logout(logout -> logout
-                        .logoutSuccessUrl("/login")
-                        /*.logoutSuccessHandler((request, response, authentication) -> {
-                            String token = extractToken(request); // JWT 추출 로직
-                            if (token != null) {
-                                refreshTokenRepositoty.deleteByRefreshToken(token);
-                            }
-                        })*/
+                            .addLogoutHandler((request, response, authentication) -> {
+
+                                // DB에서 리프레시 토큰 삭제
+                                if (authentication != null) {
+                                    // 인증 정보가 있으면
+                                    OAuth2User oAuth2User = (OAuth2User) authentication.getPrincipal();
+                                    // 메일 정보를 가져와 리프레시 토큰을 삭제한다.
+                                    String email = (String) oAuth2User.getAttributes().get("email");
+
+                                    if (email != null) {
+                                        try {
+                                            User user = userService.findByEmail(email);
+                                            refreshTokenRepositoty.deleteByUserId(user.getId());
+                                            log.info("Deleted refresh token for user: {}", email);
+                                        } catch (IllegalArgumentException e) {
+                                            log.error("Failed to delete refresh token: {}", e.getMessage());
+                                        }
+                                    }
+                                    else {
+                                        log.warn("Email is null in authentication attributes");
+                                    }
+                                }
+                                else {
+                                    // authentication 가 null 이면 쿠키를 통해 리프레시 토큰 삭제
+                                    log.warn("Authentication is null during logout");
+                                    String refreshToken = getTokenFromCookies(request, "refresh_token");
+                                    log.info("Refresh token from Cookie: {}", refreshToken);
+                                    if (refreshToken != null) {
+                                        Optional<RefreshToken> token = refreshTokenRepositoty.findByRefreshToken(refreshToken);
+                                        if (token.isPresent()) {
+                                            refreshTokenRepositoty.delete(token.get());
+                                            log.info("Deleted refresh token from Cookie {}", refreshToken);
+                                        }
+                                        else {
+                                            log.warn("No refresh token found in repository for value: {}", refreshToken);
+                                        }
+                                    }
+                                }// end of if ~ else (authentication != null)
+                                // 쿠키 삭제
+                                CookieUtil.deleteCookie(request, response, "access_token");
+                                CookieUtil.deleteCookie(request, response, "refresh_token");
+                                log.info("Deleted access_token and refresh_token cookies");
+
+                            })
+//                            .logoutUrl("/logout")
+                            .logoutSuccessUrl("/login")
+                            .invalidateHttpSession(true)
+                            .deleteCookies("access_token", "refresh_token") // 한번 더 삭제
                 )
 
                 // /api로 시작하는 url인 경우 401 상태 코드를 반환하도록 예외 처리
@@ -111,6 +159,7 @@ public class WebOAuthSecurityConfig {
                             response.setContentType("application/json");
                             response.getWriter().write("{\"error\":\"message:\": \"" + accessDeniedException.getMessage() + "\"}");
                         })
+//                        .authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
                 );
 
         return http.build();
@@ -132,5 +181,20 @@ public class WebOAuthSecurityConfig {
     @Bean
     public OAuth2AuthorizationRequestBasedOnCookieRepository oAuth2AuthorizationRequestBasedOnCookieRepository () {
         return new OAuth2AuthorizationRequestBasedOnCookieRepository();
+    }
+
+    // Cookie 추출 메소드
+    private String getTokenFromCookies(HttpServletRequest request, String cookieName) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if (cookieName.equals(cookie.getName())) {
+                    log.info("Found cookie: {}", cookieName);
+                    return cookie.getValue();
+                }
+            }
+        }
+        log.warn("No {} cookie found", cookieName);
+        return null;
     }
 }

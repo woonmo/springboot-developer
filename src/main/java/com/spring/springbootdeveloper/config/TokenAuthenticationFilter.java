@@ -65,11 +65,12 @@ public class TokenAuthenticationFilter extends OncePerRequestFilter {
         if (request.getCookies() != null) { // 쿠키가 들어 있다면
             for (Cookie cookie : request.getCookies()) {
                 if ("access_token".equals(cookie.getName())) {
+                    log.info("Found access_token: {}", cookie.getValue());
                     return cookie.getValue();
                 }
             }
         }
-
+        log.warn("No access_token found in cookies");
         return null;
     }
 }

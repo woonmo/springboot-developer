@@ -24,12 +24,12 @@ public class UserApiController {
         return "redirect:/login";   // 회원가입 이후 로그인 페이지로 이동
     }
 
-    @GetMapping("/logout")
-    public String logout(HttpServletRequest request, HttpServletResponse response) {
-        new SecurityContextLogoutHandler().logout(request, response
-                , SecurityContextHolder.getContext().getAuthentication());
-
-        return "redirect:/login";
-    }
+//    @GetMapping("/logout")
+//    public String logout(HttpServletRequest request, HttpServletResponse response) {
+//        new SecurityContextLogoutHandler().logout(request, response
+//                , SecurityContextHolder.getContext().getAuthentication());
+//
+//        return "redirect:/login";
+//    }
 
 }
