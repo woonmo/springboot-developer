@@ -61,4 +61,5 @@ out/
 
 ### VS Code ###
 .vscode/
+.DS_Store
 >>>>>>> 0054451 (project init)
